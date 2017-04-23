@@ -95,7 +95,7 @@ DbStore::sync(u_int32_t flags)
   return 0;
 }
 
-Handle<Value> DbStore::New(const Arguments& args) {
+Handle<Value> DbStore::New(const FunctionCallbackInfo<Value>& args) {
   HandleScope scope;
 
   DbStore* obj = new DbStore();
@@ -180,7 +180,7 @@ OpenAfter(uv_work_t *req, int status) {
   After(baton, argv, 1);
 }
 
-Handle<Value> DbStore::Open(const Arguments& args) {
+Handle<Value> DbStore::Open(const FunctionCallbackInfo<Value>& args) {
   HandleScope scope;
 
   DbStore* obj = ObjectWrap::Unwrap<DbStore>(args.This());
@@ -232,7 +232,7 @@ CloseAfter(uv_work_t *req, int status) {
   After(baton, argv, 1);
 }
 
-Handle<Value> DbStore::Close(const Arguments& args) {
+Handle<Value> DbStore::Close(const FunctionCallbackInfo<Value>& args) {
   HandleScope scope;
 
   DbStore* obj = ObjectWrap::Unwrap<DbStore>(args.This());
@@ -285,7 +285,7 @@ PutAfter(uv_work_t *req, int status) {
   After(baton, argv, 1);
 }
 
-Handle<Value> DbStore::Put(const Arguments& args) {
+Handle<Value> DbStore::Put(const FunctionCallbackInfo<Value>& args) {
   HandleScope scope;
 
   DbStore* obj = ObjectWrap::Unwrap<DbStore>(args.This());
@@ -371,7 +371,7 @@ GetAfter(uv_work_t *req, int status) {
   After(baton, argv, 2);
 }
 
-Handle<Value> DbStore::Get(const Arguments& args) {
+Handle<Value> DbStore::Get(const FunctionCallbackInfo<Value>& args) {
   HandleScope scope;
 
   DbStore* obj = ObjectWrap::Unwrap<DbStore>(args.This());
@@ -417,7 +417,7 @@ DelWork(uv_work_t *req) {
   //fprintf(stderr, "%p/%p: del %s => %d\n", baton, req, baton->str_arg, baton->ret);
 }
 
-Handle<Value> DbStore::Del(const Arguments& args) {
+Handle<Value> DbStore::Del(const FunctionCallbackInfo<Value>& args) {
   HandleScope scope;
 
   DbStore* obj = ObjectWrap::Unwrap<DbStore>(args.This());
@@ -448,7 +448,7 @@ Handle<Value> DbStore::Del(const Arguments& args) {
   return args.This();
 }
 
-Handle<Value> DbStore::Sync(const Arguments& args) {
+Handle<Value> DbStore::Sync(const FunctionCallbackInfo<Value>& args) {
   HandleScope scope;
 
   //DbStore* obj = ObjectWrap::Unwrap<DbStore>(args.This());

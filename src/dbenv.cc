@@ -19,7 +19,7 @@ void DbEnv::Init(Handle<Object> target) {
   target->Set(String::NewSymbol("DbEnv"), constructor);
 }
 
-Handle<Value> DbEnv::New(const Arguments& args) {
+Handle<Value> DbEnv::New(const FunctionCallbackInfo<Value>& args) {
   HandleScope scope;
 
   DbEnv* obj = new DbEnv();
@@ -29,7 +29,7 @@ Handle<Value> DbEnv::New(const Arguments& args) {
   return args.This();
 }
 
-Handle<Value> DbEnv::PlusOne(const Arguments& args) {
+Handle<Value> DbEnv::PlusOne(const FunctionCallbackInfo<Value>& args) {
   HandleScope scope;
 
   DbEnv* obj = ObjectWrap::Unwrap<DbEnv>(args.This());

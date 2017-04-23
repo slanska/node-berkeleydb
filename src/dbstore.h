@@ -2,6 +2,7 @@
 #define DBSTORE_H
 
 #include <node.h>
+#include <node_object_wrap.h>
 
 #include <db.h>
 
@@ -26,16 +27,16 @@ class DbStore : public node::ObjectWrap {
   DB_ENV *_env;
   DB_TXN *_txn;
 
-  static v8::Handle<v8::Value> New(const v8::Arguments& args);
+  static v8::Handle<v8::Value> New(const v8::FunctionCallbackInfo<v8::Value>& args);
 
-  static v8::Handle<v8::Value> Open(const v8::Arguments& args);
-  static v8::Handle<v8::Value> Close(const v8::Arguments& args);
+  static v8::Handle<v8::Value> Open(const v8::FunctionCallbackInfo<v8::Value>& args);
+  static v8::Handle<v8::Value> Close(const v8::FunctionCallbackInfo<v8::Value>& args);
 
-  static v8::Handle<v8::Value> Get(const v8::Arguments& args);
-  static v8::Handle<v8::Value> Put(const v8::Arguments& args);
-  static v8::Handle<v8::Value> Del(const v8::Arguments& args);
+  static v8::Handle<v8::Value> Get(const v8::FunctionCallbackInfo<v8::Value>& args);
+  static v8::Handle<v8::Value> Put(const v8::FunctionCallbackInfo<v8::Value>& args);
+  static v8::Handle<v8::Value> Del(const v8::FunctionCallbackInfo<v8::Value>& args);
 
-  static v8::Handle<v8::Value> Sync(const v8::Arguments& args);
+  static v8::Handle<v8::Value> Sync(const v8::FunctionCallbackInfo<v8::Value>& args);
 };
 
 #endif
