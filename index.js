@@ -2,8 +2,6 @@ var addon = require("bindings")("addon.node");
 
 var DbStore = addon.DbStore;
 
-DbStore.DbEnv = addon.DbEnv;
-
 DbStore.prototype.put = function (key, val, opts, cb) {
   if (typeof opts == 'function') {
     cb = opts; opts = {};

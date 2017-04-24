@@ -2,13 +2,14 @@
 #define DBSTORE_H
 
 #include <node.h>
+#include <node_buffer.h>
 #include <node_object_wrap.h>
 
 #include <db.h>
 
 class DbStore : public node::ObjectWrap {
  public:
-  static void Init(v8::Handle<v8::Object> target);
+  static void Init(v8::Local<v8::Object> target);
 
   int open(char const *fname, char const *db, DBTYPE type, u_int32_t flags, int mode);
   int close();
@@ -23,20 +24,17 @@ class DbStore : public node::ObjectWrap {
   DbStore();
   ~DbStore();
 
+  static v8::Persistent<v8::Function> constructor;
+
   DB *_db;
-  DB_ENV *_env;
-  DB_TXN *_txn;
 
-  static v8::Handle<v8::Value> New(const v8::FunctionCallbackInfo<v8::Value>& args);
-
-  static v8::Handle<v8::Value> Open(const v8::FunctionCallbackInfo<v8::Value>& args);
-  static v8::Handle<v8::Value> Close(const v8::FunctionCallbackInfo<v8::Value>& args);
-
-  static v8::Handle<v8::Value> Get(const v8::FunctionCallbackInfo<v8::Value>& args);
-  static v8::Handle<v8::Value> Put(const v8::FunctionCallbackInfo<v8::Value>& args);
-  static v8::Handle<v8::Value> Del(const v8::FunctionCallbackInfo<v8::Value>& args);
-
-  static v8::Handle<v8::Value> Sync(const v8::FunctionCallbackInfo<v8::Value>& args);
+  static void New(const v8::FunctionCallbackInfo<v8::Value>& args);
+  static void Open(const v8::FunctionCallbackInfo<v8::Value>& args);
+  static void Close(const v8::FunctionCallbackInfo<v8::Value>& args);
+  static void Get(const v8::FunctionCallbackInfo<v8::Value>& args);
+  static void Put(const v8::FunctionCallbackInfo<v8::Value>& args);
+  static void Del(const v8::FunctionCallbackInfo<v8::Value>& args);
+  static void Sync(const v8::FunctionCallbackInfo<v8::Value>& args);
 };
 
 #endif

@@ -2,8 +2,6 @@ var DbStore = require("..");
 
 var dbstore = new DbStore();
 
-var dbenv = new DbStore.DbEnv();
-
 var async = require('async');
 var assert = require('assert');
 
