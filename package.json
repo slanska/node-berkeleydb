@@ -21,6 +21,7 @@
     "async": "0.2.x"
   },
   "dependencies": {
-    "bindings": "1.x.x"
+    "bindings": "1.x.x",
+    "mocha": "^3.2.0"
   }
 }

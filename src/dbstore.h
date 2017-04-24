@@ -18,13 +18,10 @@ class DbStore : public node::ObjectWrap {
   int get(DBT *key, DBT *data, u_int32_t flags);
   int del(DBT *key, u_int32_t flags);
 
-  int sync(u_int32_t flags);
 
  private:
   DbStore();
   ~DbStore();
-
-  static v8::Persistent<v8::Function> constructor;
 
   DB *_db;
 
@@ -34,7 +31,6 @@ class DbStore : public node::ObjectWrap {
   static void Get(const v8::FunctionCallbackInfo<v8::Value>& args);
   static void Put(const v8::FunctionCallbackInfo<v8::Value>& args);
   static void Del(const v8::FunctionCallbackInfo<v8::Value>& args);
-  static void Sync(const v8::FunctionCallbackInfo<v8::Value>& args);
 };
 
 #endif

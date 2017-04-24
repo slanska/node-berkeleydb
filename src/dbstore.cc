@@ -3,13 +3,25 @@
 
 #include "dbstore.h"
 
+#include "workbaton.h"
+
 #include <cstdlib>
 #include <cstring>
 #include <uv.h>
 
 using namespace v8;
 
-Persistent<Function> DbStore::constructor;
+static void free_buf(char *data, void *hint) {
+  //fprintf(stderr, "Free %p\n", data);
+  free(data);
+}
+
+static void dbt_set(DBT *dbt, void *data, u_int32_t size, u_int32_t flags = DB_DBT_USERMEM) {
+  memset(dbt, 0, sizeof(*dbt));
+  dbt->data = data;
+  dbt->size = size;
+  dbt->flags = flags;
+}
 
 DbStore::DbStore() : _db(0) {};
 DbStore::~DbStore() {
@@ -24,30 +36,27 @@ void DbStore::Init(Local<Object> target) {
   Local<FunctionTemplate> tpl = FunctionTemplate::New(isolate, New);
   tpl->SetClassName(String::NewFromUtf8(isolate, "DbStore"));
   tpl->InstanceTemplate()->SetInternalFieldCount(1);
+
   // Prototype
-  tpl->PrototypeTemplate()->Set(String::NewFromUtf8(isolate, "open"),
-      FunctionTemplate::New(isolate, Open)->GetFunction());
-  tpl->PrototypeTemplate()->Set(String::NewFromUtf8(isolate, "close"),
-      FunctionTemplate::New(isolate, Close)->GetFunction());
+  NODE_SET_PROTOTYPE_METHOD(tpl, "open", Open);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "close", Close);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "_put", Put);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "_get", Get);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "del", Del);
 
-  tpl->PrototypeTemplate()->Set(String::NewFromUtf8(isolate, "_put"),
-      FunctionTemplate::New(isolate, Put)->GetFunction());
-  tpl->PrototypeTemplate()->Set(String::NewFromUtf8(isolate, "_get"),
-      FunctionTemplate::New(isolate, Get)->GetFunction());
-  tpl->PrototypeTemplate()->Set(String::NewFromUtf8(isolate, "del"),
-      FunctionTemplate::New(isolate, Del)->GetFunction());
-
-  tpl->PrototypeTemplate()->Set(String::NewFromUtf8(isolate, "sync"),
-      FunctionTemplate::New(isolate, Sync)->GetFunction());
-
-  constructor.Reset(isolate, tpl->GetFunction());
-  target->Set(String::NewFromUtf8(isolate, "DbStore"), tpl->GetFunction());
+  target->Set(
+    String::NewFromUtf8(isolate, "DbStore"),
+    tpl->GetFunction());
 }
 
-int
-DbStore::open(char const *fname, char const *db,
-              DBTYPE type, u_int32_t flags, int mode)
-{
+void DbStore::New(const FunctionCallbackInfo<Value>& args) {
+  DbStore* obj = new DbStore();
+  obj->Wrap(args.This());
+  args.GetReturnValue().Set(args.This());
+}
+
+
+int DbStore::open(char const *fname, char const *db, DBTYPE type, u_int32_t flags, int mode) {
   int ret = db_create(&_db, NULL, 0);
   if (ret) return ret;
 
@@ -55,9 +64,7 @@ DbStore::open(char const *fname, char const *db,
   return _db->open(_db, NULL, fname, db, type, flags, mode);
 }
 
-int
-DbStore::close()
-{
+int DbStore::close() {
   int ret = 0;
   if (_db && _db->pgsize) {
     //fprintf(stderr, "%p: close %p\n", this, _db);
@@ -67,81 +74,22 @@ DbStore::close()
   return ret;
 }
 
-static void
-dbt_set(DBT *dbt, void *data, u_int32_t size, u_int32_t flags = DB_DBT_USERMEM)
-{
-  memset(dbt, 0, sizeof(*dbt));
-  dbt->data = data;
-  dbt->size = size;
-  dbt->flags = flags;
-}
-
-int
-DbStore::put(DBT *key, DBT *data, u_int32_t flags)
-{
+int DbStore::put(DBT *key, DBT *data, u_int32_t flags) {
   return _db->put(_db, 0, key, data, flags);
 }
 
-int
-DbStore::get(DBT *key, DBT *data, u_int32_t flags)
-{
+int DbStore::get(DBT *key, DBT *data, u_int32_t flags) {
   return _db->get(_db, 0, key, data, flags);
 }
 
-int
-DbStore::del(DBT *key, u_int32_t flags)
-{
+int DbStore::del(DBT *key, u_int32_t flags) {
   return _db->del(_db, 0, key, flags);
 }
 
-int
-DbStore::sync(u_int32_t flags)
-{
-  return 0;
-}
 
-void DbStore::New(const FunctionCallbackInfo<Value>& args) {
-  DbStore* obj = new DbStore();
-  obj->Wrap(args.This());
-  args.GetReturnValue().Set(args.This());
-}
-
-struct WorkBaton {
-  uv_work_t *req;
-  DbStore *store;
-  Isolate *isolate;
-
-  char *str_arg;
-  Persistent<Value> data;
-  Persistent<Function> callback;
-
-  char const *call;
-  DBT inbuf;
-  DBT retbuf;
-  int ret;
-
-  WorkBaton(uv_work_t *_r, DbStore *_s);
-  ~WorkBaton();
-};
-
-
-WorkBaton::WorkBaton(uv_work_t *_r, DbStore *_s) : req(_r), store(_s), str_arg(0) {
-  //fprintf(stderr, "new WorkBaton %p:%p\n", this, req);
-}
-WorkBaton::~WorkBaton() {
-  //fprintf(stderr, "~WorkBaton %p:%p\n", this, req);
-  delete req;
-
-  if (str_arg) free(str_arg);
-  data.Reset();
-  callback.Reset();
-  // Ignore retbuf since it will be freed by Buffer
-}
-
-static void
-After(WorkBaton *baton, Local<Value> *argv, int argc)
-{
+static void After(WorkBaton *baton, Local<Value> *argv, int argc) {
   Isolate *isolate = baton->isolate;
+  HandleScope scope(isolate);
 
   if (baton->ret) {
     //fprintf(stderr, "%s %s error %d\n", baton->call, baton->str_arg, baton->ret);
@@ -163,8 +111,8 @@ After(WorkBaton *baton, Local<Value> *argv, int argc)
   delete baton;
 }
 
-void
-OpenWork(uv_work_t *req) {
+
+void OpenWork(uv_work_t *req) {
   WorkBaton *baton = (WorkBaton *) req->data;
 
   DbStore *store = baton->store;
@@ -172,8 +120,7 @@ OpenWork(uv_work_t *req) {
   baton->ret = store->open(baton->str_arg, NULL, DB_BTREE, DB_CREATE|DB_THREAD, 0);
 }
 
-void
-OpenAfter(uv_work_t *req, int status) {
+void OpenAfter(uv_work_t *req, int status) {
   // fetch our data structure
   WorkBaton *baton = (WorkBaton *)req->data;
 
@@ -215,8 +162,8 @@ void DbStore::Open(const FunctionCallbackInfo<Value>& args) {
   args.GetReturnValue().Set(args.This());
 }
 
-static void
-CloseWork(uv_work_t *req) {
+
+static void CloseWork(uv_work_t *req) {
   WorkBaton *baton = (WorkBaton *) req->data;
 
   DbStore *store = baton->store;
@@ -224,8 +171,7 @@ CloseWork(uv_work_t *req) {
   baton->ret = store->close();
 }
 
-static void
-CloseAfter(uv_work_t *req, int status) {
+static void CloseAfter(uv_work_t *req, int status) {
   // fetch our data structure
   WorkBaton *baton = (WorkBaton *)req->data;
 
@@ -259,8 +205,8 @@ void DbStore::Close(const FunctionCallbackInfo<Value>& args) {
   args.GetReturnValue().Set(args.This());
 }
 
-static void
-PutWork(uv_work_t *req) {
+
+static void PutWork(uv_work_t *req) {
   WorkBaton *baton = (WorkBaton *) req->data;
   //fprintf(stderr, "DbStore::PutWork baton %p:%p\n", baton, req);
 
@@ -275,8 +221,7 @@ PutWork(uv_work_t *req) {
   baton->ret = store->put(&key_dbt, &data_dbt, 0);
 }
 
-static void
-PutAfter(uv_work_t *req, int status) {
+static void PutAfter(uv_work_t *req, int status) {
   // fetch our data structure
   WorkBaton *baton = (WorkBaton *)req->data;
   //fprintf(stderr, "DbStore::PutAfter baton %p:%p\n", baton, req);
@@ -332,8 +277,8 @@ void DbStore::Put(const FunctionCallbackInfo<Value>& args) {
   args.GetReturnValue().Set(args.This());
 }
 
-static void
-GetWork(uv_work_t *req) {
+
+static void GetWork(uv_work_t *req) {
   WorkBaton *baton = (WorkBaton *) req->data;
 
   DbStore *store = baton->store;
@@ -349,18 +294,11 @@ GetWork(uv_work_t *req) {
   //fprintf(stderr, "get %s => %p[%d]\n", baton->str_arg, key_dbt.data, key_dbt.size);
 }
 
-static void
-free_buf(char *data, void *hint)
-{
-  //fprintf(stderr, "Free %p\n", data);
-  free(data);
-}
-
-static void
-GetAfter(uv_work_t *req, int status) {
+static void GetAfter(uv_work_t *req, int status) {
   // fetch our data structure
   WorkBaton *baton = (WorkBaton *)req->data;
   Isolate *isolate = baton->isolate;
+  HandleScope scope(isolate);
 
   // create an arguments array for the callback
   Local<Value> argv[2];
@@ -403,8 +341,8 @@ void DbStore::Get(const FunctionCallbackInfo<Value>& args) {
   args.GetReturnValue().Set(args.This());
 }
 
-static void
-DelWork(uv_work_t *req) {
+
+static void DelWork(uv_work_t *req) {
   WorkBaton *baton = (WorkBaton *) req->data;
 
   DbStore *store = baton->store;
@@ -412,7 +350,7 @@ DelWork(uv_work_t *req) {
   DBT key_dbt;
   dbt_set(&key_dbt, baton->str_arg, strlen(baton->str_arg));
 
-  //fprintf(stderr, "%p/%p: del %s\n", baton, req, baton->str_arg);
+  fprintf(stderr, "%p/%p: del %s\n", baton, req, baton->str_arg);
   baton->call = "del";
   baton->ret = store->del(&key_dbt, 0);
   //fprintf(stderr, "%p/%p: del %s => %d\n", baton, req, baton->str_arg, baton->ret);
@@ -448,12 +386,5 @@ void DbStore::Del(const FunctionCallbackInfo<Value>& args) {
   uv_queue_work(uv_default_loop(), req, DelWork, (uv_after_work_cb)PutAfter); // Yes, use the same.
 
   args.GetReturnValue().Set(args.This());
-}
-
-void DbStore::Sync(const FunctionCallbackInfo<Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-
-  //DbStore* obj = ObjectWrap::Unwrap<DbStore>(args.This());
-  args.GetReturnValue().Set(Number::New(isolate, 0));
 }
 
