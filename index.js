@@ -30,11 +30,7 @@ DbStore.prototype.get = function (key, opts={}) {
     buf = buf.toString(opts.encoding || 'utf8');
   }
   if (opts.json) {
-    try {
-      buf = JSON.parse(buf);
-    } catch (x) {
-      err = x;
-    }
+    buf = JSON.parse(buf);
   }
   return buf;
 };

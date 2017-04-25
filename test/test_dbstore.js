@@ -6,9 +6,10 @@ var async = require('async');
 var assert = require('assert');
 
 var rand = (Math.random() * 1e6).toFixed(0);
+var filename = `foo-${rand}.db`;
 
-var openRes = dbstore.open(`foo-${rand}.db`);
-console.log("opened", " ret=", openRes);
+var openRes = dbstore.open(filename);
+console.log("opened", filename, "ret=", openRes);
   
 function test_put_get(done) {
   console.log("-- test_put_get");
@@ -23,8 +24,10 @@ function test_put_get(done) {
     console.log("get", key, "=>", str.toString());
     assert(str.toString() === val);
     console.log("del", key);
-    dbstore.del(key);
-    dbstore.get(key);
+    // dbstore.del(key);
+    var str2 = dbstore.get(key);
+    console.log("get", key, "=>", str2.toString());
+    // assert(str2.toString() === "");
   }
   done();
 }

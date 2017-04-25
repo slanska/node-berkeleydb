@@ -1,7 +1,7 @@
 #include <node.h>
 #include <node_buffer.h>
 
-#include "dbstore.h"
+#include "dbenv.h"
 
 #include <cstdlib>
 #include <cstring>
@@ -9,29 +9,17 @@
 
 using namespace v8;
 
-static void free_buf(char *data, void *hint) {
-  //fprintf(stderr, "Free %p\n", data);
-  free(data);
-}
-
-static void dbt_set(DBT *dbt, void *data, u_int32_t size, u_int32_t flags = DB_DBT_USERMEM) {
-  memset(dbt, 0, sizeof(*dbt));
-  dbt->data = data;
-  dbt->size = size;
-  dbt->flags = flags;
-}
-
-DbStore::DbStore() : _db(0) {};
-DbStore::~DbStore() {
+DbEnv::DbEnv() : _db(0) {};
+DbEnv::~DbEnv() {
   close();
 };
 
-void DbStore::Init(Local<Object> exports) {
+void DbEnv::Init(Local<Object> exports) {
   Isolate* isolate = exports->GetIsolate();
 
   // Prepare constructor template
   Local<FunctionTemplate> tpl = FunctionTemplate::New(isolate, New);
-  tpl->SetClassName(String::NewFromUtf8(isolate, "DbStore"));
+  tpl->SetClassName(String::NewFromUtf8(isolate, "DbEnv"));
   tpl->InstanceTemplate()->SetInternalFieldCount(1);
 
   // Prototype
@@ -42,16 +30,19 @@ void DbStore::Init(Local<Object> exports) {
   NODE_SET_PROTOTYPE_METHOD(tpl, "_del", Del);
 
   exports->Set(
-    String::NewFromUtf8(isolate, "DbStore"),
+    String::NewFromUtf8(isolate, "DbEnv"),
     tpl->GetFunction());
 }
 
-int DbStore::open(char const *fname, char const *db, DBTYPE type, u_int32_t flags, int mode) {
+int DbEnv::open(char const *fname, char const *db, DBTYPE type, u_int32_t flags, int mode) {
+  int ret = db_create(&_db, NULL, 0);
+  if (ret) return ret;
+
   //fprintf(stderr, "%p: open %p\n", this, _db);
   return _db->open(_db, NULL, fname, db, type, flags, mode);
 }
 
-int DbStore::close(u_int32_t flags) {
+int DbEnv::close() {
   int ret = 0;
   if (_db && _db->pgsize) {
     //fprintf(stderr, "%p: close %p\n", this, _db);
@@ -61,33 +52,25 @@ int DbStore::close(u_int32_t flags) {
   return ret;
 }
 
-int DbStore::put(DBT *key, DBT *data, u_int32_t flags) {
+int DbEnv::put(DBT *key, DBT *data, u_int32_t flags) {
   return _db->put(_db, 0, key, data, flags);
 }
 
-int DbStore::get(DBT *key, DBT *data, u_int32_t flags) {
+int DbEnv::get(DBT *key, DBT *data, u_int32_t flags) {
   return _db->get(_db, 0, key, data, flags);
 }
 
-int DbStore::del(DBT *key, u_int32_t flags) {
+int DbEnv::del(DBT *key, u_int32_t flags) {
   return _db->del(_db, 0, key, flags);
 }
 
-void DbStore::New(const FunctionCallbackInfo<Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-
-  int ret = db_create(&_db, NULL, 0);
-  if (ret) {
-    isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "First argument must be String")));
-    return;
-  }
-
-  DbStore* store = new DbStore();
+void DbEnv::New(const FunctionCallbackInfo<Value>& args) {
+  DbEnv* store = new DbEnv();
   store->Wrap(args.This());
   args.GetReturnValue().Set(args.This());
 }
 
-void DbStore::Open(const FunctionCallbackInfo<Value>& args) {
+void DbEnv::Open(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
 
   if (! args[0]->IsString()) {
@@ -95,7 +78,7 @@ void DbStore::Open(const FunctionCallbackInfo<Value>& args) {
     return;
   }
 
-  DbStore* store = ObjectWrap::Unwrap<DbStore>(args.This());
+  DbEnv* store = ObjectWrap::Unwrap<DbEnv>(args.This());
   String::Utf8Value fname(args[0]);
 
   int ret = store->open(*fname, NULL, DB_HASH, DB_CREATE|DB_THREAD, 0);
@@ -104,17 +87,17 @@ void DbStore::Open(const FunctionCallbackInfo<Value>& args) {
 }
 
 
-void DbStore::Close(const FunctionCallbackInfo<Value>& args) {
+void DbEnv::Close(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
 
-  DbStore* store = ObjectWrap::Unwrap<DbStore>(args.This());
+  DbEnv* store = ObjectWrap::Unwrap<DbEnv>(args.This());
 
   int ret = store->close();
   args.GetReturnValue().Set(Number::New(isolate, double(ret)));
 }
 
 
-void DbStore::Put(const FunctionCallbackInfo<Value>& args) {
+void DbEnv::Put(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
 
   if (!(args.Length() > 0) && ! args[0]->IsString()) {
@@ -126,7 +109,7 @@ void DbStore::Put(const FunctionCallbackInfo<Value>& args) {
     isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Second argument must be a Buffer")));
     return;
   }
-  DbStore* store = ObjectWrap::Unwrap<DbStore>(args.This());
+  DbEnv* store = ObjectWrap::Unwrap<DbEnv>(args.This());
 
   String::Utf8Value key(args[0]);
   Local<Object> buf = args[1]->ToObject();
@@ -143,7 +126,7 @@ void DbStore::Put(const FunctionCallbackInfo<Value>& args) {
 }
 
 
-void DbStore::Get(const FunctionCallbackInfo<Value>& args) {
+void DbEnv::Get(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
 
   if (!(args.Length() > 0) && ! args[0]->IsString()) {
@@ -151,7 +134,7 @@ void DbStore::Get(const FunctionCallbackInfo<Value>& args) {
     return;
   }
 
-  DbStore* store = ObjectWrap::Unwrap<DbStore>(args.This());
+  DbEnv* store = ObjectWrap::Unwrap<DbEnv>(args.This());
 
   String::Utf8Value key(args[0]);
 
@@ -169,7 +152,7 @@ void DbStore::Get(const FunctionCallbackInfo<Value>& args) {
 }
 
 
-void DbStore::Del(const FunctionCallbackInfo<Value>& args) {
+void DbEnv::Del(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
 
   if (!(args.Length() > 0) && ! args[0]->IsString()) {
@@ -177,7 +160,7 @@ void DbStore::Del(const FunctionCallbackInfo<Value>& args) {
     return;
   }
 
-  DbStore* store = ObjectWrap::Unwrap<DbStore>(args.This());
+  DbEnv* store = ObjectWrap::Unwrap<DbEnv>(args.This());
   String::Utf8Value key(args[0]);
   DBT key_dbt;
   dbt_set(&key_dbt, *key, strlen(*key));

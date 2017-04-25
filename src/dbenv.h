@@ -1,5 +1,5 @@
-#ifndef DBSTORE_H
-#define DBSTORE_H
+#ifndef DBENV_H
+#define DBENV_H
 
 #include <node.h>
 #include <node_buffer.h>
@@ -7,12 +7,12 @@
 
 #include <db.h>
 
-class DbStore : public node::ObjectWrap {
+class DbEnv : public node::ObjectWrap {
  public:
   static void Init(v8::Local<v8::Object> exports);
 
   int open(char const *fname, char const *db, DBTYPE type, u_int32_t flags, int mode);
-  int close();
+  int close(u_int32_t flags);
 
   int put(DBT *key, DBT *data, u_int32_t flags);
   int get(DBT *key, DBT *data, u_int32_t flags);
@@ -20,8 +20,8 @@ class DbStore : public node::ObjectWrap {
 
 
  private:
-  DbStore();
-  ~DbStore();
+  DbEnv();
+  ~DbEnv();
 
   DB *_db;
 
