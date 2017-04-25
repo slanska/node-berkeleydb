@@ -15,7 +15,7 @@
   "private": false,
   "gypfile": true,
   "scripts": {
-    "preinstall": "make config all"
+    "install": "make config all"
   },
   "dependencies": {
     "bindings": "1.x.x",
