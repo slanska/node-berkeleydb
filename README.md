@@ -23,10 +23,13 @@ Currently the implemented methods are:
 
 
 ```
+var Db = require("berkeleydb").Db;
+var DbEnv = require("berkeleydb").DbEnv;
+
 var dbenv = new DbEnv(); // create a new db env (optional, but neccessary for transactions)
 dbenv.open("db"); // open the './db/' folder
 
-var db = new DbStore(dbenv); // create a new Db object
+var db = new Db(dbenv); // create a new Db object
 
 var key = "foo";
 var val = "bar";
