@@ -1,5 +1,5 @@
 #include <node.h>
-#include <node_buffer.h>
+#include <nan.h>
 
 #include "dbenv.h"
 
@@ -9,163 +9,75 @@
 
 using namespace v8;
 
-DbEnv::DbEnv() : _db(0) {};
+DbEnv::DbEnv() : _dbenv(0) {};
 DbEnv::~DbEnv() {
-  close();
+  close(0);
 };
 
 void DbEnv::Init(Local<Object> exports) {
-  Isolate* isolate = exports->GetIsolate();
+  Nan::HandleScope scope;
 
-  // Prepare constructor template
-  Local<FunctionTemplate> tpl = FunctionTemplate::New(isolate, New);
-  tpl->SetClassName(String::NewFromUtf8(isolate, "DbEnv"));
+  Local<FunctionTemplate> tpl = Nan::New<FunctionTemplate>(New);
+  tpl->SetClassName(Nan::New("DbEnv").ToLocalChecked());
   tpl->InstanceTemplate()->SetInternalFieldCount(1);
 
   // Prototype
-  NODE_SET_PROTOTYPE_METHOD(tpl, "open", Open);
-  NODE_SET_PROTOTYPE_METHOD(tpl, "close", Close);
-  NODE_SET_PROTOTYPE_METHOD(tpl, "_put", Put);
-  NODE_SET_PROTOTYPE_METHOD(tpl, "_get", Get);
-  NODE_SET_PROTOTYPE_METHOD(tpl, "_del", Del);
+  Nan::SetPrototypeMethod(tpl, "open", Open);
+  Nan::SetPrototypeMethod(tpl, "close", Close);
 
-  exports->Set(
-    String::NewFromUtf8(isolate, "DbEnv"),
-    tpl->GetFunction());
+  exports->Set(Nan::New("DbEnv").ToLocalChecked(), tpl->GetFunction());
 }
 
-int DbEnv::open(char const *fname, char const *db, DBTYPE type, u_int32_t flags, int mode) {
-  int ret = db_create(&_db, NULL, 0);
-  if (ret) return ret;
-
-  //fprintf(stderr, "%p: open %p\n", this, _db);
-  return _db->open(_db, NULL, fname, db, type, flags, mode);
+DB_ENV* DbEnv::get_env() {
+  return _dbenv;
 }
 
-int DbEnv::close() {
+int DbEnv::create(u_int32_t flags) {
+  return db_env_create(&_dbenv, flags);
+}
+
+int DbEnv::open(char const *db_home, u_int32_t flags, int mode) {
+  return _dbenv->open(_dbenv, db_home, flags, mode);
+}
+
+int DbEnv::close(u_int32_t flags) {
   int ret = 0;
-  if (_db && _db->pgsize) {
+  if (_dbenv && _dbenv->lg_size) {
     //fprintf(stderr, "%p: close %p\n", this, _db);
-    ret = _db->close(_db, 0);
-    _db = NULL;
+    ret = _dbenv->close(_dbenv, flags);
+    _dbenv = NULL;
   }
   return ret;
 }
 
-int DbEnv::put(DBT *key, DBT *data, u_int32_t flags) {
-  return _db->put(_db, 0, key, data, flags);
-}
+void DbEnv::New(const Nan::FunctionCallbackInfo<Value>& args) {
+  DbEnv* env = new DbEnv();
+  env->Wrap(args.This());
 
-int DbEnv::get(DBT *key, DBT *data, u_int32_t flags) {
-  return _db->get(_db, 0, key, data, flags);
-}
+  int ret = env->create(0);
+  if (ret) {
+    Nan::ThrowTypeError("Could not create DBENV object");
+    return;
+  }
 
-int DbEnv::del(DBT *key, u_int32_t flags) {
-  return _db->del(_db, 0, key, flags);
-}
-
-void DbEnv::New(const FunctionCallbackInfo<Value>& args) {
-  DbEnv* store = new DbEnv();
-  store->Wrap(args.This());
   args.GetReturnValue().Set(args.This());
 }
 
-void DbEnv::Open(const FunctionCallbackInfo<Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-
+void DbEnv::Open(const Nan::FunctionCallbackInfo<Value>& args) {
   if (! args[0]->IsString()) {
-    isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "First argument must be String")));
+    Nan::ThrowTypeError("First argument must be String");
     return;
   }
 
-  DbEnv* store = ObjectWrap::Unwrap<DbEnv>(args.This());
-  String::Utf8Value fname(args[0]);
-
-  int ret = store->open(*fname, NULL, DB_HASH, DB_CREATE|DB_THREAD, 0);
-
-  args.GetReturnValue().Set(Number::New(isolate, double(ret)));
+  DbEnv* env = Nan::ObjectWrap::Unwrap<DbEnv>(args.This());
+  String::Utf8Value db_name(args[0]);
+  int ret = env->open(*db_name, DB_INIT_TXN|DB_INIT_MPOOL|DB_CREATE|DB_THREAD, 0);
+  args.GetReturnValue().Set(Nan::New(double(ret)));
 }
 
 
-void DbEnv::Close(const FunctionCallbackInfo<Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-
-  DbEnv* store = ObjectWrap::Unwrap<DbEnv>(args.This());
-
-  int ret = store->close();
-  args.GetReturnValue().Set(Number::New(isolate, double(ret)));
+void DbEnv::Close(const Nan::FunctionCallbackInfo<Value>& args) {
+  DbEnv* env = Nan::ObjectWrap::Unwrap<DbEnv>(args.This());
+  int ret = env->close(0);
+  args.GetReturnValue().Set(Nan::New(double(ret)));
 }
-
-
-void DbEnv::Put(const FunctionCallbackInfo<Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-
-  if (!(args.Length() > 0) && ! args[0]->IsString()) {
-    isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "First argument must be a string")));
-    return;
-  }
-
-  if (!(args.Length() > 1) && ! node::Buffer::HasInstance(args[1])) {
-    isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "Second argument must be a Buffer")));
-    return;
-  }
-  DbEnv* store = ObjectWrap::Unwrap<DbEnv>(args.This());
-
-  String::Utf8Value key(args[0]);
-  Local<Object> buf = args[1]->ToObject();
-
-  DBT key_dbt;
-  dbt_set(&key_dbt, *key, strlen(*key));
-  DBT data_dbt;
-  dbt_set(&data_dbt,
-          node::Buffer::Data(buf),
-          node::Buffer::Length(buf));
-  int ret = store->put(&key_dbt, &data_dbt, 0);
-
-  args.GetReturnValue().Set(Number::New(isolate, double(ret)));
-}
-
-
-void DbEnv::Get(const FunctionCallbackInfo<Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-
-  if (!(args.Length() > 0) && ! args[0]->IsString()) {
-    isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "First argument must be a string")));
-    return;
-  }
-
-  DbEnv* store = ObjectWrap::Unwrap<DbEnv>(args.This());
-
-  String::Utf8Value key(args[0]);
-
-  DBT key_dbt;
-  dbt_set(&key_dbt, *key, strlen(*key));
-
-  DBT retbuf;
-  dbt_set(&retbuf, 0, 0, DB_DBT_MALLOC);
-
-  store->get(&key_dbt, &retbuf, 0);
-
-  Local<Object> buf = node::Buffer::New(isolate, (char*)retbuf.data, retbuf.size, free_buf, NULL).ToLocalChecked();
-
-  args.GetReturnValue().Set(buf);
-}
-
-
-void DbEnv::Del(const FunctionCallbackInfo<Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-
-  if (!(args.Length() > 0) && ! args[0]->IsString()) {
-    isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "First argument must be a string")));
-    return;
-  }
-
-  DbEnv* store = ObjectWrap::Unwrap<DbEnv>(args.This());
-  String::Utf8Value key(args[0]);
-  DBT key_dbt;
-  dbt_set(&key_dbt, *key, strlen(*key));
-  int ret = store->del(&key_dbt, 0);
-
-  args.GetReturnValue().Set(Number::New(isolate, double(ret)));
-}
-

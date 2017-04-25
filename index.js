@@ -35,4 +35,5 @@ DbStore.prototype.get = function (key, opts={}) {
   return buf;
 };
 
-module.exports = addon.DbStore;
+module.exports.DbStore = addon.DbStore;
+module.exports.DbEnv = addon.DbEnv;

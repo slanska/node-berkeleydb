@@ -1,6 +1,9 @@
-var DbStore = require("..");
+var DbStore = require("..").DbStore;
+var DbEnv = require("..").DbEnv;
 
-var dbstore = new DbStore();
+var dbenv = new DbEnv();
+console.log("open env", dbenv.open("db"));
+var dbstore = new DbStore(dbenv);
 
 var async = require('async');
 var assert = require('assert');
@@ -24,10 +27,10 @@ function test_put_get(done) {
     console.log("get", key, "=>", str.toString());
     assert(str.toString() === val);
     console.log("del", key);
-    // dbstore.del(key);
+    dbstore.del(key);
     var str2 = dbstore.get(key);
     console.log("get", key, "=>", str2.toString());
-    // assert(str2.toString() === "");
+    assert(str2.toString() === "");
   }
   done();
 }
