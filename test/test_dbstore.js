@@ -65,5 +65,7 @@ test_put_get();
 test_json();
 test_encoding();
 
-var closeRes = db.close();
-console.log("closed", "ret=", closeRes);
+var closeDb = db.close();
+var closeEnv = dbenv.close();
+
+console.log("closed", "db=", closeDb, "env=", closeEnv);

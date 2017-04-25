@@ -62,5 +62,9 @@ db.put("hex", enc_str, opts)
 var out = db.get("hex", opts);
 
 assert(enc_str == out);
+
+db.close();
+dbenv.close();
+
 ```
   
