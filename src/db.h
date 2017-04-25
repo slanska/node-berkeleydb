@@ -1,11 +1,11 @@
-#ifndef DBSTORE_H
-#define DBSTORE_H
+#ifndef DB_H
+#define DB_H
 
 #include <nan.h>
 
 #include <db.h>
 
-class DbStore : public Nan::ObjectWrap {
+class Db : public Nan::ObjectWrap {
  public:
   static void Init(v8::Local<v8::Object> exports);
 
@@ -21,8 +21,8 @@ class DbStore : public Nan::ObjectWrap {
 
 
  private:
-  DbStore();
-  ~DbStore();
+  Db();
+  ~Db();
 
   DB *_db;
 

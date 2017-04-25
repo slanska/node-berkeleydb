@@ -1,16 +1,16 @@
-var DbStore = require("..").DbStore;
+var Db = require("..").Db;
 var DbEnv = require("..").DbEnv;
 
 var dbenv = new DbEnv();
 console.log("open env", dbenv.open("db"));
-var dbstore = new DbStore(dbenv);
+var db = new Db(dbenv);
 
 var assert = require('assert');
 
 var rand = (Math.random() * 1e6).toFixed(0);
 var filename = `foo-${rand}.db`;
 
-var openRes = dbstore.open(filename);
+var openRes = db.open(filename);
 console.log("opened", filename, "ret=", openRes);
   
 function test_put_get() {
@@ -20,14 +20,14 @@ function test_put_get() {
     var key = i.toFixed(0);
     var val = (Math.random() * 1e6).toFixed(0);
 
-    dbstore.put(key, val)
+    db.put(key, val)
     console.log("put", key);
-    var str = dbstore.get(key)
+    var str = db.get(key)
     console.log("get", key, "=>", str.toString());
     assert(str.toString() === val);
     console.log("del", key);
-    dbstore.del(key);
-    var str2 = dbstore.get(key);
+    db.del(key);
+    var str2 = db.get(key);
     console.log("get", key, "=>", str2.toString());
     assert(str2.toString() === "");
   }
@@ -37,18 +37,33 @@ function test_json() {
   console.log("-- test_json");
   var opts = { json: true };
   var put_data = { test: "json1", n: 1 };
-  dbstore.put("json1", put_data, opts)
+  db.put("json1", put_data, opts)
   console.log("put json1", put_data);
-  var data = dbstore.get("json1", opts);
+  var data = db.get("json1", opts);
   console.log("get json1", data);
   assert(typeof data == 'object');
   assert(data.test == put_data.test);
   assert(data.n == put_data.n);
   console.log("del json1");
-  dbstore.del("json1");
+  db.del("json1");
+}
+
+function test_encoding() {
+  console.log("-- test_encoding");
+  var opts = { encoding: "hex" };
+  var enc_str = "4f4ca1";
+  db.put("hex", enc_str, opts)
+  console.log("put hex", enc_str);
+  var out = db.get("hex", opts);
+  console.log("get hex", out);
+  assert(enc_str == out);
+  console.log("del hex");
+  db.del("hex");
 }
 
 test_put_get();
 test_json();
-var closeRes = dbstore.close();
+test_encoding();
+
+var closeRes = db.close();
 console.log("closed", "ret=", closeRes);

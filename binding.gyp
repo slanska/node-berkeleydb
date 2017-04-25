@@ -4,7 +4,7 @@
       "target_name": "addon",
       "sources": [
         "src/addon.cc",
-        "src/dbstore.cc",
+        "src/db.cc",
         "src/dbenv.cc"
       ],
       "include_dirs": [

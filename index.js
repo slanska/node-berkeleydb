@@ -1,25 +1,25 @@
 var addon = require("bindings")("addon.node");
 
-var DbStore = addon.DbStore;
+var Db = addon.Db;
 
-DbStore.prototype.put = function (key, val, opts={}) {
+Db.prototype.put = function (key, val, opts={}) {
   if (opts.json) {
     val = JSON.stringify(val);
   }
 
   var buf = val;
   if (typeof buf == 'string') {
-    buf = new Buffer(val, 'utf8');
+    buf = new Buffer(val, opts.encoding || 'utf8');
   }
 
   return this._put(key, buf);
 };
 
-DbStore.prototype.del = function (key) {
+Db.prototype.del = function (key) {
   return this._del(key);
 };
 
-DbStore.prototype.get = function (key, opts={}) {
+Db.prototype.get = function (key, opts={}) {
   if (typeof opts == 'string') {
     opts = { encoding: opts };
   }
@@ -35,5 +35,5 @@ DbStore.prototype.get = function (key, opts={}) {
   return buf;
 };
 
-module.exports.DbStore = addon.DbStore;
+module.exports.Db = addon.Db;
 module.exports.DbEnv = addon.DbEnv;

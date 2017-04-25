@@ -1,7 +1,7 @@
 #include <node.h>
 #include <nan.h>
 
-#include "dbstore.h"
+#include "db.h"
 #include "dbenv.h"
 
 #include <cstdlib>
@@ -22,16 +22,16 @@ static void dbt_set(DBT *dbt, void *data, u_int32_t size, u_int32_t flags = DB_D
   dbt->flags = flags;
 }
 
-DbStore::DbStore() : _db(0) {};
-DbStore::~DbStore() {
+Db::Db() : _db(0) {};
+Db::~Db() {
   close(0);
 };
 
-void DbStore::Init(Local<Object> exports) {
+void Db::Init(Local<Object> exports) {
   Nan::HandleScope scope;
 
   Local<FunctionTemplate> tpl = Nan::New<FunctionTemplate>(New);
-  tpl->SetClassName(Nan::New("DbStore").ToLocalChecked());
+  tpl->SetClassName(Nan::New("Db").ToLocalChecked());
   tpl->InstanceTemplate()->SetInternalFieldCount(1);
 
   // Prototype
@@ -41,23 +41,23 @@ void DbStore::Init(Local<Object> exports) {
   Nan::SetPrototypeMethod(tpl, "_get", Get);
   Nan::SetPrototypeMethod(tpl, "_del", Del);
 
-  exports->Set(Nan::New("DbStore").ToLocalChecked(), tpl->GetFunction());
+  exports->Set(Nan::New("Db").ToLocalChecked(), tpl->GetFunction());
 }
 
-DB* DbStore::get_db() {
+DB* Db::get_db() {
   return _db;
 }
 
-int DbStore::create(DB_ENV *dbenv, u_int32_t flags) {
+int Db::create(DB_ENV *dbenv, u_int32_t flags) {
   return db_create(&_db, dbenv, flags);
 }
 
-int DbStore::open(char const *fname, char const *db, DBTYPE type, u_int32_t flags, int mode) {
+int Db::open(char const *fname, char const *db, DBTYPE type, u_int32_t flags, int mode) {
   //fprintf(stderr, "%p: open %p\n", this, _db);
   return _db->open(_db, NULL, fname, db, type, flags, mode);
 }
 
-int DbStore::close(u_int32_t flags) {
+int Db::close(u_int32_t flags) {
   int ret = 0;
   if (_db && _db->pgsize) {
     //fprintf(stderr, "%p: close %p\n", this, _db);
@@ -67,20 +67,20 @@ int DbStore::close(u_int32_t flags) {
   return ret;
 }
 
-int DbStore::put(DBT *key, DBT *data, u_int32_t flags) {
+int Db::put(DBT *key, DBT *data, u_int32_t flags) {
   return _db->put(_db, 0, key, data, flags);
 }
 
-int DbStore::get(DBT *key, DBT *data, u_int32_t flags) {
+int Db::get(DBT *key, DBT *data, u_int32_t flags) {
   return _db->get(_db, 0, key, data, flags);
 }
 
-int DbStore::del(DBT *key, u_int32_t flags) {
+int Db::del(DBT *key, u_int32_t flags) {
   return _db->del(_db, 0, key, flags);
 }
 
-void DbStore::New(const Nan::FunctionCallbackInfo<Value>& args) {
-  DbStore* store = new DbStore();
+void Db::New(const Nan::FunctionCallbackInfo<Value>& args) {
+  Db* store = new Db();
   store->Wrap(args.This());
 
   DB_ENV* _dbenv = NULL;
@@ -101,25 +101,25 @@ void DbStore::New(const Nan::FunctionCallbackInfo<Value>& args) {
   args.GetReturnValue().Set(args.This());
 }
 
-void DbStore::Open(const Nan::FunctionCallbackInfo<Value>& args) {
+void Db::Open(const Nan::FunctionCallbackInfo<Value>& args) {
   if (! args[0]->IsString()) {
     Nan::ThrowTypeError("First argument must be String");
     return;
   }
 
-  DbStore* store = Nan::ObjectWrap::Unwrap<DbStore>(args.This());
+  Db* store = Nan::ObjectWrap::Unwrap<Db>(args.This());
   String::Utf8Value fname(args[0]);
   int ret = store->open(*fname, NULL, DB_HASH, DB_CREATE|DB_THREAD, 0);
   args.GetReturnValue().Set(Nan::New(double(ret)));
 }
 
-void DbStore::Close(const Nan::FunctionCallbackInfo<Value>& args) {
-  DbStore* store = Nan::ObjectWrap::Unwrap<DbStore>(args.This());
+void Db::Close(const Nan::FunctionCallbackInfo<Value>& args) {
+  Db* store = Nan::ObjectWrap::Unwrap<Db>(args.This());
   int ret = store->close(0);
   args.GetReturnValue().Set(Nan::New(double(ret)));
 }
 
-void DbStore::Put(const Nan::FunctionCallbackInfo<Value>& args) {
+void Db::Put(const Nan::FunctionCallbackInfo<Value>& args) {
   if (!(args.Length() > 0) && ! args[0]->IsString()) {
     Nan::ThrowTypeError("First argument must be a string");
     return;
@@ -129,7 +129,7 @@ void DbStore::Put(const Nan::FunctionCallbackInfo<Value>& args) {
     Nan::ThrowTypeError("Second argument must be a Buffer");
     return;
   }
-  DbStore* store = Nan::ObjectWrap::Unwrap<DbStore>(args.This());
+  Db* store = Nan::ObjectWrap::Unwrap<Db>(args.This());
 
   String::Utf8Value key(args[0]);
   Local<Object> buf = args[1]->ToObject();
@@ -146,13 +146,13 @@ void DbStore::Put(const Nan::FunctionCallbackInfo<Value>& args) {
   args.GetReturnValue().Set(Nan::New(double(ret)));
 }
 
-void DbStore::Get(const Nan::FunctionCallbackInfo<Value>& args) {
+void Db::Get(const Nan::FunctionCallbackInfo<Value>& args) {
   if (!(args.Length() > 0) && ! args[0]->IsString()) {
     Nan::ThrowTypeError("First argument must be a string");
     return;
   }
 
-  DbStore* store = Nan::ObjectWrap::Unwrap<DbStore>(args.This());
+  Db* store = Nan::ObjectWrap::Unwrap<Db>(args.This());
 
   String::Utf8Value key(args[0]);
 
@@ -168,13 +168,13 @@ void DbStore::Get(const Nan::FunctionCallbackInfo<Value>& args) {
   args.GetReturnValue().Set(buf);
 }
 
-void DbStore::Del(const Nan::FunctionCallbackInfo<Value>& args) {
+void Db::Del(const Nan::FunctionCallbackInfo<Value>& args) {
   if (!(args.Length() > 0) && ! args[0]->IsString()) {
     Nan::ThrowTypeError("First argument must be a string");
     return;
   }
 
-  DbStore* store = Nan::ObjectWrap::Unwrap<DbStore>(args.This());
+  Db* store = Nan::ObjectWrap::Unwrap<Db>(args.This());
 
   String::Utf8Value key(args[0]);
   
