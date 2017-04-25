@@ -21,7 +21,6 @@ Currently the implemented methods are:
     - open
     - close
 
-
 ```
 var Db = require("berkeleydb").Db;
 var DbEnv = require("berkeleydb").DbEnv;
@@ -67,4 +66,13 @@ db.close();
 dbenv.close();
 
 ```
-  
+
+# Todo
+
+* Full Documentation
+* Implement DB_TXN
+* Implement DBcursor
+* Implement Bulk search operations
+* Implement DB_SEQUENCE
+* Implement DB_LOGC
+
