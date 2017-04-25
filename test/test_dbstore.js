@@ -5,7 +5,6 @@ var dbenv = new DbEnv();
 console.log("open env", dbenv.open("db"));
 var dbstore = new DbStore(dbenv);
 
-var async = require('async');
 var assert = require('assert');
 
 var rand = (Math.random() * 1e6).toFixed(0);
@@ -14,7 +13,7 @@ var filename = `foo-${rand}.db`;
 var openRes = dbstore.open(filename);
 console.log("opened", filename, "ret=", openRes);
   
-function test_put_get(done) {
+function test_put_get() {
   console.log("-- test_put_get");
 
   for (var i = 0; i < 5000; ++i) {
@@ -32,10 +31,9 @@ function test_put_get(done) {
     console.log("get", key, "=>", str2.toString());
     assert(str2.toString() === "");
   }
-  done();
 }
 
-function test_json(done) {
+function test_json() {
   console.log("-- test_json");
   var opts = { json: true };
   var put_data = { test: "json1", n: 1 };
@@ -48,12 +46,9 @@ function test_json(done) {
   assert(data.n == put_data.n);
   console.log("del json1");
   dbstore.del("json1");
-  done();
 }
 
-async.series([test_put_get, test_json], function (err) {
-  assert.ifError(err);
-  var closeRes = dbstore.close();
-  console.log("closed", "ret=", closeRes);
-});
-
+test_put_get();
+test_json();
+var closeRes = dbstore.close();
+console.log("closed", "ret=", closeRes);
