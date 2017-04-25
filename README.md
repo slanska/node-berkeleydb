@@ -21,7 +21,7 @@ Currently the implemented methods are:
     - open
     - close
 
-```
+```node
 var Db = require("berkeleydb").Db;
 var DbEnv = require("berkeleydb").DbEnv;
 
