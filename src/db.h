@@ -12,12 +12,12 @@ class Db : public Nan::ObjectWrap {
   DB* get_db();
 
   int create(DB_ENV *dbenv, u_int32_t flags);
-  int open(char const *fname, char const *db, DBTYPE type, u_int32_t flags, int mode);
+  int open(DB_TXN *txn, char const *fname, char const *db, DBTYPE type, u_int32_t flags, int mode);
   int close(u_int32_t flags);
 
-  int get(DBT *key, DBT *data, u_int32_t flags);
-  int put(DBT *key, DBT *data, u_int32_t flags);
-  int del(DBT *key, u_int32_t flags);
+  int get(DB_TXN *txn, DBT *key, DBT *data, u_int32_t flags);
+  int put(DB_TXN *txn, DBT *key, DBT *data, u_int32_t flags);
+  int del(DB_TXN *txn, DBT *key, u_int32_t flags);
 
 
  private:
@@ -25,6 +25,8 @@ class Db : public Nan::ObjectWrap {
   ~Db();
 
   DB *_db;
+  DB_ENV* get_env();
+
 
   static void New(const Nan::FunctionCallbackInfo<v8::Value>& args);
   static void Open(const Nan::FunctionCallbackInfo<v8::Value>& args);

@@ -2,6 +2,7 @@
 #include <nan.h>
 
 #include "dbenv.h"
+#include "dbtxn.h"
 
 #include <cstdlib>
 #include <cstring>
@@ -24,6 +25,7 @@ void DbEnv::Init(Local<Object> exports) {
   // Prototype
   Nan::SetPrototypeMethod(tpl, "open", Open);
   Nan::SetPrototypeMethod(tpl, "close", Close);
+  // Nan::SetPrototypeMethod(tpl, "txnBegin", TxnBegin);
 
   exports->Set(Nan::New("DbEnv").ToLocalChecked(), tpl->GetFunction());
 }
@@ -71,10 +73,9 @@ void DbEnv::Open(const Nan::FunctionCallbackInfo<Value>& args) {
 
   DbEnv* env = Nan::ObjectWrap::Unwrap<DbEnv>(args.This());
   String::Utf8Value db_name(args[0]);
-  int ret = env->open(*db_name, DB_INIT_TXN|DB_INIT_MPOOL|DB_CREATE|DB_THREAD, 0);
+  int ret = env->open(*db_name, DB_INIT_TXN|DB_INIT_LOG|DB_INIT_LOCK|DB_INIT_MPOOL|DB_CREATE|DB_THREAD, 0);
   args.GetReturnValue().Set(Nan::New(double(ret)));
 }
-
 
 void DbEnv::Close(const Nan::FunctionCallbackInfo<Value>& args) {
   DbEnv* env = Nan::ObjectWrap::Unwrap<DbEnv>(args.This());

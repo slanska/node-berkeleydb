@@ -5,7 +5,8 @@
       "sources": [
         "src/addon.cc",
         "src/db.cc",
-        "src/dbenv.cc"
+        "src/dbenv.cc",
+        "src/dbtxn.cc"
       ],
       "include_dirs": [
         "../include",

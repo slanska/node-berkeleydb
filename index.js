@@ -12,11 +12,13 @@ Db.prototype.put = function (key, val, opts={}) {
     buf = new Buffer(val, opts.encoding || 'utf8');
   }
 
-  return this._put(key, buf);
+  var args = opts.txn ? [key, buf, opts.txn] : [key, buf];
+  return this._put.apply(this, args);
 };
 
-Db.prototype.del = function (key) {
-  return this._del(key);
+Db.prototype.del = function (key, opts={}) {
+  var args = opts.txn ? [key, opts.txn] : [key];
+  return this._del.apply(this, args);
 };
 
 Db.prototype.get = function (key, opts={}) {
@@ -24,7 +26,8 @@ Db.prototype.get = function (key, opts={}) {
     opts = { encoding: opts };
   }
 
-  var buf = this._get(key);
+  var args = opts.txn ? [key, opts.txn] : [key];
+  var buf = this._get.apply(this, args);
 
   if (opts.encoding || opts.json) {
     buf = buf.toString(opts.encoding || 'utf8');
@@ -37,3 +40,4 @@ Db.prototype.get = function (key, opts={}) {
 
 module.exports.Db = addon.Db;
 module.exports.DbEnv = addon.DbEnv;
+module.exports.DbTxn = addon.DbTxn;

@@ -1,9 +1,10 @@
-var Db = require("..").Db;
-var DbEnv = require("..").DbEnv;
+const util = require('util')
 
-var dbenv = new DbEnv();
+var bdb = require("..");
+
+var dbenv = new bdb.DbEnv();
 console.log("open env", dbenv.open("db"));
-var db = new Db(dbenv);
+var db = new bdb.Db(dbenv);
 
 var assert = require('assert');
 
@@ -16,7 +17,7 @@ console.log("opened", filename, "ret=", openRes);
 function test_put_get() {
   console.log("-- test_put_get");
 
-  for (var i = 0; i < 5000; ++i) {
+  for (var i = 0; i < 100; ++i) {
     var key = i.toFixed(0);
     var val = (Math.random() * 1e6).toFixed(0);
 
@@ -61,9 +62,64 @@ function test_encoding() {
   db.del("hex");
 }
 
+function test_transactions() {
+  console.log("-- test_transactions");
+
+  var txn = new bdb.DbTxn(dbenv);
+  var opts = { txn };
+
+  console.log("created", txn.constructor.name);
+
+  console.log("putting elements 1, 2, 3 in txn");
+  db.put("1", "one", opts);
+  db.put("2", "two", opts);
+  db.put("3", "three", opts);
+
+  var retCommit = txn.commit();
+  console.log("commited transaction", retCommit);
+  
+  var out1 = db.get("1");
+  var out2 = db.get("2");
+  var out3 = db.get("3");
+  console.log("get 1", out1);
+  console.log("get 2", out2);
+  console.log("get 3", out3);
+  assert("one" == out1);
+  assert("two" == out2);
+  assert("three" == out3);
+
+  var txn2 = new bdb.DbTxn(dbenv);
+  var opts2 = { txn: txn2 };
+  console.log("created", txn2);
+
+  console.log("putting elements 4, 5, 6 in txn");
+  db.put("4", "four", opts2);
+  db.put("5", "five", opts2);
+  db.put("6", "six", opts2);
+
+  var retAbort = txn2.abort();
+  console.log("aborted transaction", retAbort);
+
+  var out4 = db.get("4");
+  var out5 = db.get("5");
+  var out6 = db.get("6");
+  console.log("get 4", out4);
+  console.log("get 5", out5);
+  console.log("get 6", out6);
+  assert("" == out4);
+  assert("" == out5);
+  assert("" == out6);
+
+  console.log("del 1, 2, 3");
+  db.del("1");
+  db.del("2");
+  db.del("3");
+}
+
 test_put_get();
 test_json();
 test_encoding();
+test_transactions();
 
 var closeDb = db.close();
 var closeEnv = dbenv.close();

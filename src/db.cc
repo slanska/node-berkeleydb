@@ -3,6 +3,7 @@
 
 #include "db.h"
 #include "dbenv.h"
+#include "dbtxn.h"
 
 #include <cstdlib>
 #include <cstring>
@@ -52,9 +53,9 @@ int Db::create(DB_ENV *dbenv, u_int32_t flags) {
   return db_create(&_db, dbenv, flags);
 }
 
-int Db::open(char const *fname, char const *db, DBTYPE type, u_int32_t flags, int mode) {
-  //fprintf(stderr, "%p: open %p\n", this, _db);
-  return _db->open(_db, NULL, fname, db, type, flags, mode);
+int Db::open(DB_TXN *txnid, char const *fname, char const *db, DBTYPE type, u_int32_t flags, int mode) {
+  // fprintf(stderr, "Db::open - txnid = %p\n", txnid);
+  return _db->open(_db, txnid, fname, db, type, flags, mode);
 }
 
 int Db::close(u_int32_t flags) {
@@ -67,16 +68,21 @@ int Db::close(u_int32_t flags) {
   return ret;
 }
 
-int Db::put(DBT *key, DBT *data, u_int32_t flags) {
-  return _db->put(_db, 0, key, data, flags);
+DB_ENV* Db::get_env() {
+  return _db->get_env(_db);
 }
 
-int Db::get(DBT *key, DBT *data, u_int32_t flags) {
-  return _db->get(_db, 0, key, data, flags);
+int Db::put(DB_TXN *txn, DBT *key, DBT *data, u_int32_t flags) {
+  // fprintf(stderr, "Db::put - txn = %p\n", txn);
+  return _db->put(_db, txn, key, data, flags);
 }
 
-int Db::del(DBT *key, u_int32_t flags) {
-  return _db->del(_db, 0, key, flags);
+int Db::get(DB_TXN *txn, DBT *key, DBT *data, u_int32_t flags) {
+  return _db->get(_db, txn, key, data, flags);
+}
+
+int Db::del(DB_TXN *txn, DBT *key, u_int32_t flags) {
+  return _db->del(_db, txn, key, flags);
 }
 
 void Db::New(const Nan::FunctionCallbackInfo<Value>& args) {
@@ -108,8 +114,15 @@ void Db::Open(const Nan::FunctionCallbackInfo<Value>& args) {
   }
 
   Db* store = Nan::ObjectWrap::Unwrap<Db>(args.This());
+  DB_TXN *tid = 0;
+
+  DB_ENV *env = store->get_env();
+  if (env) {
+    env->txn_begin(env, NULL, &tid, 0);
+  }
   String::Utf8Value fname(args[0]);
-  int ret = store->open(*fname, NULL, DB_HASH, DB_CREATE|DB_THREAD, 0);
+  int ret = store->open(tid, *fname, NULL, DB_HASH, DB_CREATE|DB_THREAD, 0);
+  tid->commit(tid, 0);
   args.GetReturnValue().Set(Nan::New(double(ret)));
 }
 
@@ -120,6 +133,9 @@ void Db::Close(const Nan::FunctionCallbackInfo<Value>& args) {
 }
 
 void Db::Put(const Nan::FunctionCallbackInfo<Value>& args) {
+  // fprintf(stderr, "Db::Put (start) - args[2] = %p\n", *args[2]);
+  DB_TXN * dbtxn = NULL;
+
   if (!(args.Length() > 0) && ! args[0]->IsString()) {
     Nan::ThrowTypeError("First argument must be a string");
     return;
@@ -129,27 +145,49 @@ void Db::Put(const Nan::FunctionCallbackInfo<Value>& args) {
     Nan::ThrowTypeError("Second argument must be a Buffer");
     return;
   }
+
+  if (args.Length() > 2) {
+    if (! args[2]->IsObject()) {
+      Nan::ThrowTypeError("Third argument must be a Object");
+      return;
+    }
+    Local<Object> wrapped = args[2]->ToObject();
+    DbTxn *_dbtxn = Nan::ObjectWrap::Unwrap<DbTxn>(wrapped);
+    dbtxn = _dbtxn->get_txn();
+    // fprintf(stderr, "Db::Put - dbtxn = %p, _ = %p (wrapped %p)\n", dbtxn, _dbtxn, *wrapped);
+  }
   Db* store = Nan::ObjectWrap::Unwrap<Db>(args.This());
 
   String::Utf8Value key(args[0]);
   Local<Object> buf = args[1]->ToObject();
-
-  DBT key_dbt;
-  dbt_set(&key_dbt, *key, strlen(*key));
-  DBT data_dbt;
-  dbt_set(&data_dbt,
+  
+  DBT * key_dbt = new DBT();
+  dbt_set(key_dbt, *key, strlen(*key));
+  DBT * data_dbt = new DBT();
+  dbt_set(data_dbt,
           node::Buffer::Data(buf),
           node::Buffer::Length(buf));
 
-  int ret = store->put(&key_dbt, &data_dbt, 0);
+  int ret = store->put(dbtxn, key_dbt, data_dbt, 0);
 
   args.GetReturnValue().Set(Nan::New(double(ret)));
 }
 
 void Db::Get(const Nan::FunctionCallbackInfo<Value>& args) {
+  DB_TXN * dbtxn = NULL;
+
   if (!(args.Length() > 0) && ! args[0]->IsString()) {
     Nan::ThrowTypeError("First argument must be a string");
     return;
+  }
+
+  if (args.Length() > 1) {
+    if (! args[1]->IsObject()) {
+      Nan::ThrowTypeError("Second argument must be a Object");
+      return;
+    }
+    DbTxn *_dbtxn = Nan::ObjectWrap::Unwrap<DbTxn>(args[1]->ToObject());
+    dbtxn = _dbtxn->get_txn();
   }
 
   Db* store = Nan::ObjectWrap::Unwrap<Db>(args.This());
@@ -161,7 +199,7 @@ void Db::Get(const Nan::FunctionCallbackInfo<Value>& args) {
   DBT retbuf;
   dbt_set(&retbuf, 0, 0, DB_DBT_MALLOC);
 
-  store->get(&key_dbt, &retbuf, 0);
+  store->get(dbtxn, &key_dbt, &retbuf, 0);
 
   Local<Object> buf = Nan::NewBuffer((char*)retbuf.data, retbuf.size, free_buf, NULL).ToLocalChecked();
 
@@ -169,9 +207,20 @@ void Db::Get(const Nan::FunctionCallbackInfo<Value>& args) {
 }
 
 void Db::Del(const Nan::FunctionCallbackInfo<Value>& args) {
+  DB_TXN * dbtxn = NULL;
+
   if (!(args.Length() > 0) && ! args[0]->IsString()) {
     Nan::ThrowTypeError("First argument must be a string");
     return;
+  }
+
+  if (args.Length() > 1) {
+    if (! args[1]->IsObject()) {
+      Nan::ThrowTypeError("Second argument must be a Object");
+      return;
+    }
+    DbTxn *_dbtxn = Nan::ObjectWrap::Unwrap<DbTxn>(args[1]->ToObject());
+    dbtxn = _dbtxn->get_txn();
   }
 
   Db* store = Nan::ObjectWrap::Unwrap<Db>(args.This());
@@ -181,7 +230,7 @@ void Db::Del(const Nan::FunctionCallbackInfo<Value>& args) {
   DBT key_dbt;
   dbt_set(&key_dbt, *key, strlen(*key));
   
-  int ret = store->del(&key_dbt, 0);
+  int ret = store->del(dbtxn, &key_dbt, 0);
 
   args.GetReturnValue().Set(Nan::New(double(ret)));
 }
