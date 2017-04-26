@@ -15,7 +15,8 @@
   "private": false,
   "gypfile": true,
   "scripts": {
-    "install": "make config all"
+    "install": "make config all",
+    "test": "node ./test/test_dbstore.js"
   },
   "dependencies": {
     "bindings": "1.x.x",
