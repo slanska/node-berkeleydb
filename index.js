@@ -33,7 +33,7 @@ Db.prototype.get = function (key, opts={}) {
     buf = buf.toString(opts.encoding || 'utf8');
   }
   if (opts.json) {
-    buf = JSON.parse(buf);
+    buf = JSON.parse(buf || null);
   }
   return buf;
 };

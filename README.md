@@ -155,7 +155,6 @@ Transactions provides ACID-ity to the db operations. See [Berkeley Db Transactio
 
 * `commit()` - Commits the operations associated to the transaction, with appropriate locking.
   - returns `[number]` - 0 if successful, otherwise an error occurred.
-
 * `abort()` - Aborts the transaction.
   - returns `[number]` - 0 if successful, otherwise an error occurred.
 
@@ -171,6 +170,6 @@ Transactions provides ACID-ity to the db operations. See [Berkeley Db Transactio
 * Implement DB_SEQUENCE
 * Implement DB_LOGC
 
-### Licence
+## Licence
 
 node-berkeleydb is licensed under an MIT license. All rights not explicitly granted in the MIT license are reserved. See the included LICENSE file for more details.
