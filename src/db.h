@@ -14,6 +14,7 @@ class Db : public Nan::ObjectWrap {
   int create(DB_ENV *dbenv, u_int32_t flags);
   int open(DB_TXN *txn, char const *fname, char const *db, DBTYPE type, u_int32_t flags, int mode);
   int close(u_int32_t flags);
+  int truncate(DB_TXN *txnid, u_int32_t *countp, u_int32_t flags);
 
   int get(DB_TXN *txn, DBT *key, DBT *data, u_int32_t flags);
   int put(DB_TXN *txn, DBT *key, DBT *data, u_int32_t flags);
@@ -31,6 +32,7 @@ class Db : public Nan::ObjectWrap {
   static void New(const Nan::FunctionCallbackInfo<v8::Value>& args);
   static void Open(const Nan::FunctionCallbackInfo<v8::Value>& args);
   static void Close(const Nan::FunctionCallbackInfo<v8::Value>& args);
+  static void Truncate(const Nan::FunctionCallbackInfo<v8::Value>& args);
   static void Get(const Nan::FunctionCallbackInfo<v8::Value>& args);
   static void Put(const Nan::FunctionCallbackInfo<v8::Value>& args);
   static void Del(const Nan::FunctionCallbackInfo<v8::Value>& args);

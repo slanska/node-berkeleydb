@@ -4,24 +4,13 @@
 #include "db.h"
 #include "dbenv.h"
 #include "dbtxn.h"
+#include "util.h"
 
 #include <cstdlib>
 #include <cstring>
 #include <uv.h>
 
 using namespace v8;
-
-static void free_buf(char *data, void *hint) {
-  //fprintf(stderr, "Free %p\n", data);
-  free(data);
-}
-
-static void dbt_set(DBT *dbt, void *data, u_int32_t size, u_int32_t flags = DB_DBT_USERMEM) {
-  memset(dbt, 0, sizeof(*dbt));
-  dbt->data = data;
-  dbt->size = size;
-  dbt->flags = flags;
-}
 
 Db::Db() : _db(0) {};
 Db::~Db() {
@@ -38,6 +27,7 @@ void Db::Init(Local<Object> exports) {
   // Prototype
   Nan::SetPrototypeMethod(tpl, "open", Open);
   Nan::SetPrototypeMethod(tpl, "close", Close);
+  Nan::SetPrototypeMethod(tpl, "truncate", Truncate);
   Nan::SetPrototypeMethod(tpl, "_put", Put);
   Nan::SetPrototypeMethod(tpl, "_get", Get);
   Nan::SetPrototypeMethod(tpl, "_del", Del);
@@ -47,6 +37,10 @@ void Db::Init(Local<Object> exports) {
 
 DB* Db::get_db() {
   return _db;
+}
+
+DB_ENV* Db::get_env() {
+  return _db->get_env(_db);
 }
 
 int Db::create(DB_ENV *dbenv, u_int32_t flags) {
@@ -68,8 +62,8 @@ int Db::close(u_int32_t flags) {
   return ret;
 }
 
-DB_ENV* Db::get_env() {
-  return _db->get_env(_db);
+int Db::truncate(DB_TXN *txn, u_int32_t *countp, u_int32_t flags) {
+  return _db->truncate(_db, txn, countp, flags);
 }
 
 int Db::put(DB_TXN *txn, DBT *key, DBT *data, u_int32_t flags) {
@@ -92,7 +86,7 @@ void Db::New(const Nan::FunctionCallbackInfo<Value>& args) {
   DB_ENV* _dbenv = NULL;
   if (args.Length() > 0) {
     if (! args[0]->IsObject()) {
-      return Nan::ThrowTypeError("First argument must be an object");
+      return Nan::ThrowTypeError("First argument must be a DbEnv object");
     }
     DbEnv* dbenv = Nan::ObjectWrap::Unwrap<DbEnv>(args[0]->ToObject());
     _dbenv = dbenv->get_env();
@@ -109,20 +103,22 @@ void Db::New(const Nan::FunctionCallbackInfo<Value>& args) {
 
 void Db::Open(const Nan::FunctionCallbackInfo<Value>& args) {
   if (! args[0]->IsString()) {
-    Nan::ThrowTypeError("First argument must be String");
+    Nan::ThrowTypeError("First argument must be a String (path to db)");
     return;
   }
 
   Db* store = Nan::ObjectWrap::Unwrap<Db>(args.This());
-  DB_TXN *tid = 0;
+  DB_TXN *tid = NULL;
 
   DB_ENV *env = store->get_env();
   if (env) {
     env->txn_begin(env, NULL, &tid, 0);
   }
   String::Utf8Value fname(args[0]);
-  int ret = store->open(tid, *fname, NULL, DB_HASH, DB_CREATE|DB_THREAD, 0);
-  tid->commit(tid, 0);
+  int ret = store->open(tid, *fname, NULL, DB_BTREE, DB_CREATE|DB_THREAD, 0);
+  if (tid) {
+    tid->commit(tid, 0);
+  }
   args.GetReturnValue().Set(Nan::New(double(ret)));
 }
 
@@ -132,23 +128,39 @@ void Db::Close(const Nan::FunctionCallbackInfo<Value>& args) {
   args.GetReturnValue().Set(Nan::New(double(ret)));
 }
 
+void Db::Truncate(const Nan::FunctionCallbackInfo<Value>& args) {
+  Db* store = Nan::ObjectWrap::Unwrap<Db>(args.This());
+  DB_TXN *tid = NULL;
+  db_recno_t *countp = NULL;
+
+  DB_ENV *env = store->get_env();
+  if (env) {
+    env->txn_begin(env, NULL, &tid, 0);
+  }
+  int ret = store->truncate(tid, countp, 0);
+  if (tid && !ret) {
+    tid->commit(tid, 0);
+  }
+  args.GetReturnValue().Set(Nan::New(u_int32_t(u_long(&countp))));
+}
+
 void Db::Put(const Nan::FunctionCallbackInfo<Value>& args) {
   // fprintf(stderr, "Db::Put (start) - args[2] = %p\n", *args[2]);
   DB_TXN * dbtxn = NULL;
 
   if (!(args.Length() > 0) && ! args[0]->IsString()) {
-    Nan::ThrowTypeError("First argument must be a string");
+    Nan::ThrowTypeError("First argument must be a String (key)");
     return;
   }
 
   if (!(args.Length() > 1) && ! node::Buffer::HasInstance(args[1])) {
-    Nan::ThrowTypeError("Second argument must be a Buffer");
+    Nan::ThrowTypeError("Second argument must be a Buffer (value)");
     return;
   }
 
   if (args.Length() > 2) {
     if (! args[2]->IsObject()) {
-      Nan::ThrowTypeError("Third argument must be a Object");
+      Nan::ThrowTypeError("Third argument must be a DbTxn object");
       return;
     }
     Local<Object> wrapped = args[2]->ToObject();
@@ -176,14 +188,14 @@ void Db::Put(const Nan::FunctionCallbackInfo<Value>& args) {
 void Db::Get(const Nan::FunctionCallbackInfo<Value>& args) {
   DB_TXN * dbtxn = NULL;
 
-  if (!(args.Length() > 0) && ! args[0]->IsString()) {
-    Nan::ThrowTypeError("First argument must be a string");
+  if (args.Length() == 0 || ! args[0]->IsString()) {
+    Nan::ThrowTypeError("First argument must be a String (key)");
     return;
   }
 
   if (args.Length() > 1) {
     if (! args[1]->IsObject()) {
-      Nan::ThrowTypeError("Second argument must be a Object");
+      Nan::ThrowTypeError("Second argument must be a DbTxn object");
       return;
     }
     DbTxn *_dbtxn = Nan::ObjectWrap::Unwrap<DbTxn>(args[1]->ToObject());
@@ -210,13 +222,13 @@ void Db::Del(const Nan::FunctionCallbackInfo<Value>& args) {
   DB_TXN * dbtxn = NULL;
 
   if (!(args.Length() > 0) && ! args[0]->IsString()) {
-    Nan::ThrowTypeError("First argument must be a string");
+    Nan::ThrowTypeError("First argument must be a String (key)");
     return;
   }
 
   if (args.Length() > 1) {
     if (! args[1]->IsObject()) {
-      Nan::ThrowTypeError("Second argument must be a Object");
+      Nan::ThrowTypeError("Second argument must be a DbTxn object");
       return;
     }
     DbTxn *_dbtxn = Nan::ObjectWrap::Unwrap<DbTxn>(args[1]->ToObject());

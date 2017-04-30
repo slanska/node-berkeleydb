@@ -6,7 +6,8 @@
         "src/addon.cc",
         "src/db.cc",
         "src/dbenv.cc",
-        "src/dbtxn.cc"
+        "src/dbtxn.cc",
+        "src/dbcursor.cc"
       ],
       "include_dirs": [
         "../include",

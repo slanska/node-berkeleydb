@@ -13,9 +13,12 @@ var filename = `foo-${rand}.db`;
 
 var openRes = db.open(filename);
 console.log("opened", filename, "ret=", openRes);
+console.log("truncated db", filename);
   
-function test_put_get() {
-  console.log("-- test_put_get");
+function test_put_get_del_trunc() {
+  console.log("-- test_put_get_del_trunc");
+  
+  db.truncate();
 
   for (var i = 0; i < 100; ++i) {
     var key = i.toFixed(0);
@@ -116,10 +119,81 @@ function test_transactions() {
   db.del("3");
 }
 
-test_put_get();
+function test_cursors() {
+  console.log("-- test_cursors");
+  console.log("putting elements 1, 2, 3, 4, 5, 6");
+  db.put("1", "one");
+  db.put("2", "two");
+  db.put("3", "three");
+  db.put("4", "four");
+
+  // var cursor = new bdb.DbCursor(db);
+  var txn = new bdb.DbTxn(dbenv);
+  var cursor = new bdb.DbCursor(db, txn);
+  console.log("opened cursor");
+
+  var res;
+  res = cursor.next();
+  console.log(res);
+  assert(res.key == "1");
+  assert(res.value.toString() == "one");
+  
+  res = cursor.last();
+  console.log(res);
+  assert(res.key == "4");
+  assert(res.value.toString() == "four");
+  
+  res = cursor.prev();
+  console.log(res);
+  assert(res.key == "3");
+  assert(res.value.toString() == "three");
+  
+  res = cursor.set("2");
+  console.log(res);
+  assert(res.key == "2");
+  assert(res.value.toString() == "two");
+  
+  res = cursor.put("twotwo");
+  assert(res == 0);
+
+  res = cursor.current();
+  console.log(res);
+  assert(res.key == "2");
+  assert(res.value.toString() == "twotwo");
+  
+  res = cursor.first();
+  console.log(res);
+  assert(res.key == "1");
+  assert(res.value.toString() == "one");
+  
+  res = cursor.prev();
+  console.log(res);
+  assert(res.key == null);
+  assert(res.value.toString() == "");
+  
+  cursor.last();
+  res = cursor.next();
+  console.log(res);
+  assert(res.key == null);
+  assert(res.value.toString() == "");
+
+  cursor.first();
+  cursor.del();
+  cursor.next();
+  cursor.del();
+  cursor.next();
+  cursor.del();
+  cursor.next();
+  cursor.del();
+
+  cursor.close();
+}
+
+test_put_get_del_trunc();
 test_json();
 test_encoding();
 test_transactions();
+test_cursors();
 
 var closeDb = db.close();
 var closeEnv = dbenv.close();
