@@ -15,8 +15,8 @@ Nan::Persistent<Function> DbTxn::constructor;
 
 DbTxn::DbTxn() : _dbtxn(0) {};
 DbTxn::~DbTxn() {
-  abort();
-  discard(0);
+  // abort();
+  // discard(0);
 };
 
 void DbTxn::Init(Local<Object> exports) {
