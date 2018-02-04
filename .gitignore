@@ -4,3 +4,4 @@ node_modules
 bin
 include
 lib
+/deps/db-6.2.32/docs/
