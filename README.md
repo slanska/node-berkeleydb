@@ -1,3 +1,5 @@
+
+
 # node-berkeleydb
 
 Nodejs bindings for Berkeley DB 6.x
@@ -13,6 +15,11 @@ Based on the initial work [dbstore](https://github.com/leei/node-dbstore) by Lee
   `var bdb = require("berkeleydb");`
 
 All calls are synchronous, since berkeleydb itself is synchronous.
+
+### Debugging (in XCode on macOS)
+
+node-gyp configure -- -f xcode
+
 
 ### DB
 
