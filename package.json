@@ -15,11 +15,16 @@
   "private": false,
   "gypfile": true,
   "scripts": {
-    "install": "make config all",
+    "install": "make config all & node-gyp configure",
     "test": "node ./test/test_dbstore.js"
   },
   "dependencies": {
     "bindings": "1.x.x",
     "nan": "^2.6.2"
+  },
+  "devDependencies": {
+    "better-sqlite3": "^4.1.0",
+    "levelup": "^2.0.1",
+    "sqlite3": "^3.1.13"
   }
 }
