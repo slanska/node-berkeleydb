@@ -1,6 +1,4 @@
 build
-deps/db-6.2.32/docs
-deps/db-6.2.32/build_unix
 
 node_modules
 bin
